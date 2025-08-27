@@ -1,0 +1,244 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: asia-northeast1
+  SERVICE_NAME: ai-media-assistant
+
+jobs:
+  # テスト・ビルド
+  test-and-build:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    # バックエンドテスト
+    - name: Install Python dependencies
+      working-directory: ./backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov
+
+    - name: Run backend tests
+      working-directory: ./backend
+      env:
+        DATABASE_URL: postgresql+asyncpg://postgres:password@localhost:5432/test_db
+        REDIS_URL: redis://localhost:6379
+      run: |
+        pytest tests/ -v --cov=app --cov-report=xml
+
+    - name: Upload backend coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend/coverage.xml
+        flags: backend
+
+    # フロントエンドテスト
+    - name: Install frontend dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Run frontend tests
+      working-directory: ./frontend
+      run: |
+        npm run lint
+        npm run type-check
+        npm run build
+
+    # Dockerイメージビルド
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        push: false
+        tags: ai-media-assistant-backend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        push: false
+        tags: ai-media-assistant-frontend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # セキュリティスキャン
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: test-and-build
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # デプロイ (mainブランチのみ)
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: [test-and-build, security-scan]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Configure Docker to use gcloud
+      run: gcloud auth configure-docker
+
+    # Docker イメージをGCRにプッシュ
+    - name: Build and push backend image
+      run: |
+        docker build -t gcr.io/$GCP_PROJECT_ID/ai-media-assistant-backend:$GITHUB_SHA ./backend
+        docker push gcr.io/$GCP_PROJECT_ID/ai-media-assistant-backend:$GITHUB_SHA
+
+    - name: Build and push frontend image
+      run: |
+        docker build -t gcr.io/$GCP_PROJECT_ID/ai-media-assistant-frontend:$GITHUB_SHA ./frontend
+        docker push gcr.io/$GCP_PROJECT_ID/ai-media-assistant-frontend:$GITHUB_SHA
+
+    # Cloud Run デプロイ
+    - name: Deploy backend to Cloud Run
+      run: |
+        gcloud run deploy ai-media-assistant-backend \
+          --image gcr.io/$GCP_PROJECT_ID/ai-media-assistant-backend:$GITHUB_SHA \
+          --platform managed \
+          --region $GCP_REGION \
+          --allow-unauthenticated \
+          --memory 2Gi \
+          --cpu 2 \
+          --max-instances 10 \
+          --set-env-vars="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+          --set-env-vars="OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" \
+          --set-env-vars="REDIS_URL=${{ secrets.REDIS_URL }}"
+
+    - name: Deploy frontend to Cloud Run
+      run: |
+        gcloud run deploy ai-media-assistant-frontend \
+          --image gcr.io/$GCP_PROJECT_ID/ai-media-assistant-frontend:$GITHUB_SHA \
+          --platform managed \
+          --region $GCP_REGION \
+          --allow-unauthenticated \
+          --memory 1Gi \
+          --cpu 1 \
+          --max-instances 5 \
+          --set-env-vars="NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}"
+
+    # Cloud Functions デプロイ (マルチモーダル処理)
+    - name: Deploy processing functions
+      working-directory: ./infrastructure/gcp/functions
+      run: |
+        gcloud functions deploy media-processor \
+          --runtime python39 \
+          --trigger-http \
+          --allow-unauthenticated \
+          --memory 2048MB \
+          --timeout 540s \
+          --set-env-vars="GCP_PROJECT_ID=$GCP_PROJECT_ID"
+
+    # Slack通知
+    - name: Notify Slack on success
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: "✅ AI Media Assistant のデプロイが完了しました！\n🚀 Backend: https://ai-media-assistant-backend-xxx.run.app\n🌐 Frontend: https://ai-media-assistant-frontend-xxx.run.app"
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Notify Slack on failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: "❌ AI Media Assistant のデプロイに失敗しました。ログを確認してください。"
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # パフォーマンステスト
+  performance-test:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: deploy
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Lighthouse CI
+      uses: treosh/lighthouse-ci-action@v9
+      with:
+        urls: |
+          https://ai-media-assistant-frontend-xxx.run.app
+        configPath: './lighthouse.config.js'
+        uploadArtifacts: true
+        temporaryPublicStorage: true
