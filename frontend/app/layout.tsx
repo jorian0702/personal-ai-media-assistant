@@ -8,12 +8,12 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'AI Media Assistant',
-  description: '個人学習用AIメディア処理アシスタント - モダンWeb技術とAIの融合',
-  keywords: ['AI', '機械学習', 'Next.js', 'Python', '個人プロジェクト', '学習用'],
-  authors: [{ name: '個人学習プロジェクト' }],
+  description: '妹用AIメディア処理アシスタント - ファイル整理を楽にするツール',
+  keywords: ['AI', 'メディア処理', 'ファイル整理', 'Next.js', 'Python', '趣味プロジェクト'],
+  authors: [{ name: '妹思いのお兄ちゃん' }],
   openGraph: {
     title: 'AI Media Assistant',
-    description: '個人学習用AIプロジェクト - 最新AI技術の統合実験',
+    description: '妹のメディアファイル整理用に作ったAIアプリ',
     type: 'website',
     locale: 'ja_JP',
   },

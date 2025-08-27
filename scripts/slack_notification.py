@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 趣味プロジェクト完成通知スクリプト
-個人学習プロジェクトの完成を通知
+妹用AIアプリの完成を通知
 """
 
 import requests
@@ -28,20 +28,20 @@ def send_slack_notification(webhook_url: str, message: Dict[str, Any]) -> bool:
 def create_completion_message() -> Dict[str, Any]:
     """完成通知メッセージ作成"""
     return {
-        "text": "🎉 趣味のAIプロジェクト完成！",
+        "text": "🎉 妹用AIアプリ完成！",
         "blocks": [
             {
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "🚀 AI Media Assistant - 個人プロジェクト完成！"
+                    "text": "🚀 AI Media Assistant - 妹用アプリ完成！"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*趣味で作ってたAI学習プロジェクトが完成したよ！ 🤖*"
+                    "text": "*妹のメディアファイル整理用にAIアプリを作ったよ！ 🤖*"
                 }
             },
             {
@@ -71,14 +71,14 @@ def create_completion_message() -> Dict[str, Any]:
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "🛠️ *学んだ技術*\n• 🐍 Python FastAPI + 非同期プログラミング\n• ☁️ Google Cloud Platform\n• 🎬 マルチモーダルAI（画像・動画・音声）\n• 📊 テキストマイニング・自然言語処理\n• 🧠 機械学習（PyTorch）\n• 🔄 CI/CD（GitHub Actions）"
+                    "text": "🛠️ *使った技術*\n• 🐍 Python FastAPI（高速API）\n• ☁️ Google Cloud Platform（デプロイ）\n• 🎬 マルチモーダルAI（画像・動画・音声処理）\n• 📊 テキストマイニング（自動タグ付け）\n• 🧠 機械学習（PyTorch）\n• 🔄 CI/CD（自動デプロイ）"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "🤖 *実装したAI機能*\n• 🔗 LLM統合（OpenAI、Claude）\n• 🔍 RAG・ベクトル検索（ChromaDB）\n• 🤖 AIエージェント\n• 🕷️ Webスクレイピング・RSS\n• ⚡ MLモデル最適化\n• 🔒 本格的なアーキテクチャ"
+                    "text": "🤖 *妹が喜んだ機能*\n• 🔗 ChatGPT/Claude連携（賢い検索）\n• 🔍 曖昧検索（「あの猫の写真」で見つかる）\n• 🤖 自動ファイル整理\n• 🕷️ SNS画像の自動収集\n• ⚡ 爆速処理（待たせない）\n• 🎨 可愛いUI"
                 }
             },
             {
@@ -102,14 +102,14 @@ def create_completion_message() -> Dict[str, Any]:
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*🎯 プロジェクト達成度: 完成！*\n\n趣味で始めたマルチモーダルAI処理アシスタントが完成。コンテンツ前処理からRAGベースの生成まで、最新のAI技術を統合した本格的なWebアプリケーションができました。"
+                    "text": "*🎯 結果: 妹に大好評！*\n\n写真や動画の整理で困ってた妹のために作ったAIアプリが完成。「こんなのが欲しかった！」って喜んでくれて、作った甲斐があったよ。最新AI技術を使った本格的なアプリになりました。"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*⏰ 完成日時*: {datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}\n*👨‍💻 作成者*: 個人学習プロジェクト\n*🎊 ステータス*: **ポートフォリオ準備完了！**"
+                    "text": f"*⏰ 完成日時*: {datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}\n*👨‍💻 作成者*: 妹思いのお兄ちゃん\n*🎊 ステータス*: **妹が使ってくれてる！**"
                 }
             },
             {
@@ -145,8 +145,8 @@ def main():
     if not webhook_url:
         # テスト用のWebhook URL（実際の環境では環境変数を使用）
         print("⚠️ SLACK_WEBHOOK_URL環境変数が設定されていません")
-        print("🎉 AI Media Assistant 趣味プロジェクト完成！")
-        print("📊 本格的なAIアプリケーション、ポートフォリオ準備完了")
+        print("🎉 妹用AI Media Assistant完成！")
+        print("📊 妹に喜んでもらえる本格的なAIアプリができました")
         return
     
     # 完成通知メッセージ作成・送信

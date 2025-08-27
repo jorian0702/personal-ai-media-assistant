@@ -1,6 +1,6 @@
 """
 AI Media Assistant - FastAPI Application
-個人学習用AIメディア処理アシスタント - メインアプリケーション
+妹用AIメディア処理アシスタント - メインアプリケーション
 """
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AI Media Assistant API",
-    description="個人学習用AIメディア処理アシスタント - マルチモーダルコンテンツ処理",
+    description="妹用AIメディア処理アシスタント - マルチモーダルコンテンツ処理",
     version="1.0.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan
